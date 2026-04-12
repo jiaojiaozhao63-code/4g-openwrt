@@ -1,0 +1,59 @@
+name: Build 4G OpenWrt
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential libncurses5-dev python3 unzip git
+
+      - name: Download OpenWrt source
+        run: |
+          wget https://github.com/openwrt/openwrt/archive/refs/heads/openwrt-21.02.zip
+          unzip openwrt-21.02.zip
+          mv openwrt-openwrt-21.02 openwrt
+
+      - name: Configure with 4G support
+        run: |
+          cd openwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          cat > .config <<EOF
+          CONFIG_TARGET_ramips=y
+          CONFIG_TARGET_ramips_mt76x8=y
+          # 4G模块核心驱动
+          CONFIG_PACKAGE_kmod-usb-serial=y
+          CONFIG_PACKAGE_kmod-usb-serial-wwan=y
+          CONFIG_PACKAGE_kmod-usb-net=y
+          CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
+          CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+          # 拨号工具
+          CONFIG_PACKAGE_comgt=y
+          CONFIG_PACKAGE_comgt-ncm=y
+          CONFIG_PACKAGE_luci-proto-qmi=y
+          CONFIG_PACKAGE_luci-proto-ncm=y
+          CONFIG_PACKAGE_luci-proto-3g=y
+          CONFIG_PACKAGE_usb-modeswitch=y
+          # 网页管理界面
+          CONFIG_PACKAGE_luci=y
+          EOF
+          make defconfig
+
+      - name: Compile firmware
+        run: |
+          cd openwrt
+          make -j$(nproc) V=s
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4G-OpenWrt-Firmware
+          path: openwrt/bin/targets/ramips/mt76x8/*.bin
