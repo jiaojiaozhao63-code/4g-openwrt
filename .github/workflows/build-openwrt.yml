@@ -6,11 +6,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-20.04
+    timeout-minutes: 360  # 👈 只加了这个，防止被GitHub杀掉
     steps:
       - name: 安装编译依赖
         run: |
           sudo apt update
-          sudo apt install -y build-essential libncurses-dev git python3 unzip wget gawk flex bison libssl-dev zlib1g-dev libelf-dev subversion libncursesw5-dev libreadline-dev libtool automake autoconf pkg-config ccache gcc-multilib g++-multilib
+          sudo apt install -y build-essential libncurses-dev git python3 unzip wget gawk flex bison libssl-dev zlib1g-dev libelf-dev subversion libncursesw5-dev libreadline-dev libtool automake autoconf pkg-config gcc-multilib g++-multilib
 
       - name: 拉取 OpenWrt 官方源码 (23.05)
         uses: actions/checkout@v4
@@ -77,7 +78,6 @@ jobs:
           # PCIe 启用脚本 (首次启动时自动执行)
           cat > files/etc/uci-defaults/99-enable-pcie <<'EOF'
           #!/bin/sh
-          # 检查是否已经打过补丁
           if [ ! -f /lib/firmware/pcie-fix.dtb ]; then
               cat > /tmp/pcie-fix.dts <<'DTS'
           /dts-v1/;
@@ -130,13 +130,13 @@ jobs:
           # CONFIG_IPV6 is not set
           EOF
 
-      - name: 生成完整配置
-        run: make defconfig
-
       - name: 更新并安装 feeds
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+      - name: 生成完整配置
+        run: make defconfig
 
       - name: 下载所有依赖包
         run: make download -j$(nproc)
